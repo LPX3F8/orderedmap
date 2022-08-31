@@ -10,7 +10,7 @@ import (
 // The actual key-value pair exists in the basic map
 // All operations lock objects and use read-write mutex
 // to reduce lock competition.
-type OrderedMap[K, V comparable] struct {
+type OrderedMap[K comparable, V any] struct {
 	keys     *glist.List[K]
 	elements map[K]*glist.Element[K]
 	values   map[K]V
@@ -18,7 +18,7 @@ type OrderedMap[K, V comparable] struct {
 }
 
 // New returns a pointer of *OrderedMap[K, V]
-func New[K, V comparable]() *OrderedMap[K, V] {
+func New[K comparable, V any]() *OrderedMap[K, V] {
 	return &OrderedMap[K, V]{
 		keys:     glist.New[K](),
 		elements: map[K]*glist.Element[K]{},
