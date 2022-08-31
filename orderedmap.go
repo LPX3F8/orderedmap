@@ -118,3 +118,12 @@ func (m *OrderedMap[K, V]) Range(f func(key K, val V) bool) {
 	}
 	return
 }
+
+func (m *OrderedMap[K, V]) Clear() *OrderedMap[K, V] {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.keys = glist.New[K]()
+	m.elements = map[K]*glist.Element[K]{}
+	m.values = map[K]V{}
+	return m
+}
