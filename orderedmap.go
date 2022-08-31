@@ -84,6 +84,19 @@ func (m *OrderedMap[K, V]) Len() int {
 	return m.keys.Len()
 }
 
+// Slice returns the values slice
+func (m *OrderedMap[K, V]) Slice() []V {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	idx := 0
+	slice := make([]V, m.keys.Len())
+	for e := m.keys.Front(); e != nil; e = e.Next() {
+		slice[idx] = m.values[e.Value]
+		idx++
+	}
+	return slice
+}
+
 // Range calls f sequentially for each key and value present in the map.
 // If f returns false, range stops the iteration.
 //
