@@ -9,7 +9,7 @@ go get -u github.com/LPX3F8/orderedmap
 
 # Example
 ```go
-import "github.com/LPX3F8/base/orderedmap"
+import "github.com/LPX3F8/orderedmap"
 
 func main() {
 	om := orderedmap.New[string, int]()
