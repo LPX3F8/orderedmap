@@ -44,7 +44,10 @@ func TestNewOrderedMap(t *testing.T) {
 
 	l := m.Slice()
 	a.Equal(len(l), m.Len())
+	rl := m.Reverse()
+	a.Equal(len(rl), m.Len())
 	a.Equal(0, len(m.Clear().Slice()))
+	a.Equal(0, len(m.Clear().Reverse()))
 }
 
 func hammerOrderedMap(t *testing.T, m *OrderedMap[int, int], loops int, group *sync.WaitGroup) {
