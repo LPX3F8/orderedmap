@@ -2,6 +2,7 @@ package orderedmap
 
 import (
 	"encoding/json"
+	"fmt"
 	"math/rand"
 	"sync"
 	"testing"
@@ -102,4 +103,39 @@ func TestOrderedMap_MarshalJSON(t *testing.T) {
 		}{Key: "key3", KeyInfo: "k3info"}, 3)
 	d, err = json.Marshal(m2)
 	a.Error(err)
+}
+
+func TestOrderedMap_Example(t *testing.T) {
+	om := New[string, int]()
+	om.Store("k1", 1).Store("k2", 2).Store("k3", 3).
+		Store("k4", 4).Store("k5", 5)
+	om.Load("k5")                // return 5, true
+	om.LoadOrStore("k5", 55)     // return 5, true
+	om.LoadOrStore("k6", 6)      // return 6, false
+	om.Delete("k6").Delete("k7") // 'k6' be removed, Deleting a non-existent key will not report an error.
+	om.Has("k6")                 // return false
+
+	// use filter func to filter items
+	filter1 := func(idx int, k string, v int) (want bool) { return v > 1 }
+	filter2 := func(idx int, k string, v int) (want bool) { return v < 5 }
+	filter3 := func(idx int, k string, v int) (want bool) { return v%2 == 0 }
+	s0 := om.Slice()
+	fmt.Println(s0) // out: [1 2 3 4 5]
+	s1 := om.Slice(filter1, filter2, filter3)
+	fmt.Println(s1) // out: [2 4]
+
+	// use a filter to filter the key value when travel items
+	om.TravelForward(func(idx int, k string, v int) (skip bool) {
+		fmt.Printf("[NOFILTER] idx: %v, key: %v, val: %v\n", idx, k, v)
+		return false
+	})
+	om.TravelForward(func(idx int, k string, v int) (skip bool) {
+		fmt.Printf("[FILTER] idx: %v, key: %v, val: %v\n", idx, k, v)
+		return false
+	}, filter3)
+
+	// JSON Marshal
+	// output: {"k1":1,"k2":2,"k3":3,"k4":4,"k5":5}
+	jBytes, _ := json.Marshal(om)
+	fmt.Println(string(jBytes))
 }

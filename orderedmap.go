@@ -4,12 +4,20 @@ import (
 	"bytes"
 	"sync"
 
-	j "github.com/json-iterator/go"
-
 	"github.com/LPX3F8/glist"
+	j "github.com/json-iterator/go"
 )
 
 var _customJson = j.ConfigCompatibleWithStandardLibrary
+
+type Filter[K comparable, V any] func(idx int, key K, val V) (want bool)
+type Visitor[K comparable, V any] func(idx int, key K, val V) (skip bool)
+type TravelMode uint
+
+const (
+	Forward TravelMode = iota
+	Reverse
+)
 
 // OrderedMap use List[T] to ensure order
 // The actual key-value pair exists in the basic map
@@ -89,54 +97,85 @@ func (m *OrderedMap[K, V]) Len() int {
 	return m.keys.Len()
 }
 
-// Slice returns the values slice
-func (m *OrderedMap[K, V]) Slice() []V {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	idx := 0
-	slice := make([]V, m.keys.Len())
-	for e := m.keys.Front(); e != nil; e = e.Next() {
-		slice[idx] = m.values[e.Value]
-		idx++
-	}
-	return slice
+// Slice returns the elements slice
+func (m *OrderedMap[K, V]) Slice(filters ...Filter[K, V]) []V {
+	return m.slice(Forward, filters...)
 }
 
-// Reverse returns the reversed values slice
-func (m *OrderedMap[K, V]) Reverse() []V {
+// Reverse the elements in the array.
+func (m *OrderedMap[K, V]) Reverse(filters ...Filter[K, V]) []V {
+	return m.slice(Reverse, filters...)
+}
+
+// Slice returns the elements slice
+func (m *OrderedMap[K, V]) slice(mode TravelMode, filters ...Filter[K, V]) []V {
+	slice := make([]V, m.keys.Len())
+	num := 0
+	m.Travel(mode, func(idx int, key K, val V) bool {
+		slice[num] = val
+		num++
+		return false
+	}, filters...)
+	return slice[:num]
+}
+
+func (m *OrderedMap[K, V]) TravelForward(f Visitor[K, V], filters ...Filter[K, V]) {
+	m.Travel(Forward, f, filters...)
+}
+
+func (m *OrderedMap[K, V]) TravelReverse(f Visitor[K, V], filters ...Filter[K, V]) {
+	m.Travel(Reverse, f, filters...)
+}
+
+func (m *OrderedMap[K, V]) Travel(mode TravelMode, f Visitor[K, V], filters ...Filter[K, V]) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	idx := 0
-	slice := make([]V, m.keys.Len())
-	for e := m.keys.Back(); e != nil; e = e.Prev() {
-		slice[idx] = m.values[e.Value]
-		idx++
+
+	var (
+		idx  int
+		skip bool
+		drop bool
+		hf   func() *glist.Element[K]
+		nf   func(e *glist.Element[K]) *glist.Element[K]
+		key  K
+		val  V
+	)
+
+	if mode == Forward {
+		hf = m.keys.Front
+		nf = func(e *glist.Element[K]) *glist.Element[K] { return e.Next() }
+	} else {
+		hf = m.keys.Back
+		nf = func(e *glist.Element[K]) *glist.Element[K] { return e.Prev() }
 	}
-	return slice
+
+	for e := hf(); e != nil; e = nf(e) {
+		idx++
+		key = e.Value
+		val = m.values[e.Value]
+		for _, filter := range filters {
+			if drop = !filter(idx-1, key, val); drop {
+				break
+			}
+		}
+		if drop {
+			continue
+		}
+		if skip = f(idx-1, key, val); skip {
+			break
+		}
+	}
 }
 
 // Range calls f sequentially for each key and value present in the map.
 // If f returns false, range stops the iteration.
-//
-// Range does not necessarily correspond to any consistent snapshot of the Map's
-// contents: no key will be visited more than once, but if the value for any key
-// is stored or deleted concurrently (including by f), Range may reflect any
-// mapping for that key from any point during the Range call. Range does not
-// block other methods on the receiver; even f itself may call any method on m.
-//
-// Range may be O(N) with the number of elements in the map even if f returns
-// false after a constant number of calls.
+// Deprecated: Please replace it with the TravelForward.
 func (m *OrderedMap[K, V]) Range(f func(key K, val V) bool) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	for e := m.keys.Front(); e != nil; e = e.Next() {
-		if !f(e.Value, m.values[e.Value]) {
-			break
-		}
-	}
+	m.TravelForward(func(idx int, k K, val V) bool { return f(k, val) })
 	return
 }
 
+// Clear empty saved elements
 func (m *OrderedMap[K, V]) Clear() *OrderedMap[K, V] {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -146,6 +185,8 @@ func (m *OrderedMap[K, V]) Clear() *OrderedMap[K, V] {
 	return m
 }
 
+// MarshalJSON implement the json.Marshaler interface.
+// the interface implemented by types that can marshal themselves into valid JSON.
 func (m *OrderedMap[K, V]) MarshalJSON() ([]byte, error) {
 	var err error
 	var keyBytes, valBytes []byte
