@@ -10,8 +10,17 @@ import (
 
 var _customJson = j.ConfigCompatibleWithStandardLibrary
 
+// Filter Used to filter elements during traversal
+// this method receives the position index of the element in OrderedMap, and the key-value.
+// Only when the method returns true will the element be passed to the subsequent Filter and Visitor.
+// The relationship between multiple Filter is 'and'.
 type Filter[K comparable, V any] func(idx int, key K, val V) (want bool)
+
+// Visitor is the method to allow user access to the elements when visit all items.
+// Returning true will interrupt the traversal.
 type Visitor[K comparable, V any] func(idx int, key K, val V) (skip bool)
+
+// TravelMode used to specify the direction of traversal
 type TravelMode uint
 
 const (
@@ -24,19 +33,17 @@ const (
 // All operations lock objects and use read-write mutex
 // to reduce lock competition.
 type OrderedMap[K comparable, V any] struct {
-	keys     *glist.List[K]
-	elements map[K]*glist.Element[K]
-	values   map[K]V
-	mu       *sync.RWMutex
+	keys  *glist.List[K]
+	items map[K]*Item[K, V]
+	mu    *sync.RWMutex
 }
 
 // New returns a pointer of *OrderedMap[K, V]
 func New[K comparable, V any]() *OrderedMap[K, V] {
 	return &OrderedMap[K, V]{
-		keys:     glist.New[K](),
-		elements: map[K]*glist.Element[K]{},
-		values:   map[K]V{},
-		mu:       new(sync.RWMutex),
+		keys:  glist.New[K](),
+		items: map[K]*Item[K, V]{},
+		mu:    new(sync.RWMutex),
 	}
 }
 
@@ -44,10 +51,9 @@ func New[K comparable, V any]() *OrderedMap[K, V] {
 func (m *OrderedMap[K, V]) Store(k K, v V) *OrderedMap[K, V] {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if _, ok := m.values[k]; !ok {
-		m.elements[k] = m.keys.PushBack(k)
+	if _, ok := m.items[k]; !ok {
+		m.items[k] = newItem(k, v, m.keys.PushBack(k), m)
 	}
-	m.values[k] = v
 	return m
 }
 
@@ -71,21 +77,23 @@ func (m *OrderedMap[K, V]) Has(k K) bool {
 // Load returns the value stored in the map for a key,
 // or zero-value if no value is present, It depends on the data type.
 // The ok result indicates whether value was found in the map.
-func (m *OrderedMap[K, V]) Load(k K) (val V, ok bool) {
+func (m *OrderedMap[K, V]) Load(k K) (V, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	val, ok = m.values[k]
-	return
+	if val, ok := m.items[k]; ok {
+		return val.Value(), true
+	}
+	var v V
+	return v, false
 }
 
 // Delete removes key-value pair
 func (m *OrderedMap[K, V]) Delete(k K) *OrderedMap[K, V] {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if ele, ok := m.elements[k]; ok {
-		m.keys.Remove(ele)
-		delete(m.elements, k)
-		delete(m.values, k)
+	if ele, ok := m.items[k]; ok {
+		m.keys.Remove(ele.elements())
+		delete(m.items, k)
 	}
 	return m
 }
@@ -95,6 +103,26 @@ func (m *OrderedMap[K, V]) Len() int {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.keys.Len()
+}
+
+// Front returns the first Item of list l or nil if the list is empty.
+func (m *OrderedMap[K, V]) Front() *Item[K, V] {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if n := m.keys.Front(); n != nil {
+		return m.items[n.Value]
+	}
+	return nil
+}
+
+// Back returns the last Item of list l or nil if the list is empty.
+func (m *OrderedMap[K, V]) Back() *Item[K, V] {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if n := m.keys.Back(); n != nil {
+		return m.items[n.Value]
+	}
+	return nil
 }
 
 // Slice returns the elements slice
@@ -119,14 +147,17 @@ func (m *OrderedMap[K, V]) slice(mode TravelMode, filters ...Filter[K, V]) []V {
 	return slice[:num]
 }
 
+// TravelForward all items with visitor and filters
 func (m *OrderedMap[K, V]) TravelForward(f Visitor[K, V], filters ...Filter[K, V]) {
 	m.Travel(Forward, f, filters...)
 }
 
+// TravelReverse all items with visitor and filters
 func (m *OrderedMap[K, V]) TravelReverse(f Visitor[K, V], filters ...Filter[K, V]) {
 	m.Travel(Reverse, f, filters...)
 }
 
+// Travel items with custom travel mode
 func (m *OrderedMap[K, V]) Travel(mode TravelMode, f Visitor[K, V], filters ...Filter[K, V]) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -137,8 +168,7 @@ func (m *OrderedMap[K, V]) Travel(mode TravelMode, f Visitor[K, V], filters ...F
 		drop bool
 		hf   func() *glist.Element[K]
 		nf   func(e *glist.Element[K]) *glist.Element[K]
-		key  K
-		val  V
+		item *Item[K, V]
 	)
 
 	if mode == Forward {
@@ -151,17 +181,16 @@ func (m *OrderedMap[K, V]) Travel(mode TravelMode, f Visitor[K, V], filters ...F
 
 	for e := hf(); e != nil; e = nf(e) {
 		idx++
-		key = e.Value
-		val = m.values[e.Value]
+		item = m.items[e.Value]
 		for _, filter := range filters {
-			if drop = !filter(idx-1, key, val); drop {
+			if drop = !filter(idx-1, item.Key(), item.Value()); drop {
 				break
 			}
 		}
 		if drop {
 			continue
 		}
-		if skip = f(idx-1, key, val); skip {
+		if skip = f(idx-1, item.Key(), item.Value()); skip {
 			break
 		}
 	}
@@ -180,8 +209,7 @@ func (m *OrderedMap[K, V]) Clear() *OrderedMap[K, V] {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.keys = glist.New[K]()
-	m.elements = map[K]*glist.Element[K]{}
-	m.values = map[K]V{}
+	m.items = map[K]*Item[K, V]{}
 	return m
 }
 
@@ -196,7 +224,7 @@ func (m *OrderedMap[K, V]) MarshalJSON() ([]byte, error) {
 		if keyBytes, err = _customJson.Marshal(e.Value); err != nil {
 			break
 		}
-		if valBytes, err = _customJson.Marshal(m.values[e.Value]); err != nil {
+		if valBytes, err = _customJson.Marshal(m.items[e.Value].Value()); err != nil {
 			break
 		}
 		buf.Write(keyBytes)

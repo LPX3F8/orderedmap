@@ -1,13 +1,12 @@
 # orderedmap
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Report Card](https://goreportcard.com/badge/github.com/LPX3F8/orderedmap)](https://goreportcard.com/report/github.com/LPX3F8/orderedmap)
-![Coverage](https://img.shields.io/badge/Coverage-95.3%25-brightgreen)
-[![](https://img.shields.io/badge/README-English-yellow.svg)](https://github.com/LPX3F8/orderedmap/blob/main/README.md)
-
+![Coverage](https://img.shields.io/badge/Coverage-94.4%25-brightgreen)
+[![](https://img.shields.io/badge/README-中文-yellow.svg)](https://github.com/LPX3F8/orderedmap/blob/main/README_CN.md)
 
  🧑‍💻 一个Go语言实现的有序字典，支持泛型，线程安全。
 
-### 安装
+## 安装
 - go version >= 1.18
 ```bash
 go get -u github.com/LPX3F8/orderedmap
@@ -21,12 +20,12 @@ go get -u github.com/LPX3F8/orderedmap
 - 支持泛型；
 - 线程安全；
 
-### 使用案例
+## Example
 ```go
 import "github.com/LPX3F8/orderedmap"
 
 func main() {
-	om := orderedmap.New[string, int]()
+	om := New[string, int]()
 	om.Store("k1", 1).Store("k2", 2).Store("k3", 3).
 		Store("k4", 4).Store("k5", 5)
 	om.Load("k5")                // return 5, true
@@ -44,9 +43,20 @@ func main() {
 	s1 := om.Slice(filter1, filter2, filter3)
 	fmt.Println(s1) // out: [2 4]
 
+	// travel items
+	for i := om.Front(); i != nil; i = i.Next() {
+		fmt.Println("[TEST FRONT]", i.Key(), i.Value())
+	}
+	for i := om.Back(); i != nil; i = i.Prev() {
+		fmt.Println("[TEST BACK]", i.Key(), i.Value())
+	}
 	// use a filter to filter the key value when travel items
 	om.TravelForward(func(idx int, k string, v int) (skip bool) {
-		fmt.Printf("idx: %v, key: %v, val: %v\n", idx, k, v)
+		fmt.Printf("[NOFILTER] idx: %v, key: %v, val: %v\n", idx, k, v)
+		return false
+	})
+	om.TravelForward(func(idx int, k string, v int) (skip bool) {
+		fmt.Printf("[FILTER] idx: %v, key: %v, val: %v\n", idx, k, v)
 		return false
 	}, filter3)
 
@@ -54,23 +64,28 @@ func main() {
 	// output: {"k1":1,"k2":2,"k3":3,"k4":4,"k5":5}
 	jBytes, _ := json.Marshal(om)
 	fmt.Println(string(jBytes))
+}
 ```
 
-### 性能测试
+## Benchmark
 ```text
-# orderedmap basic test
-BenchmarkOrderedMap-10                	 3441459	       340.9 ns/op	      32 B/op	       1 allocs/op
-BenchmarkOrderedMapSlack-10           	 3154348	       379.2 ns/op	      32 B/op	       1 allocs/op
-BenchmarkOrderedMapWork-10            	 3171066	       380.2 ns/op	      32 B/op	       1 allocs/op
-BenchmarkOrderedMapWorkSlack-10       	 2857524	       421.1 ns/op	      32 B/op	       1 allocs/op
+goos: darwin
+goarch: arm64
+pkg: github.com/LPX3F8/orderedmap
 
-# golang sync.Map
-BenchmarkNativeSyncMap_Store-10             	 1813066	       764.5 ns/op	     192 B/op	       5 allocs/op
-BenchmarkNativeSyncMap_LoadOrStore-10       	 1691062	       686.5 ns/op	     117 B/op	       4 allocs/op
-BenchmarkNativeSyncMap_Delete-10            	 1000000            2913 ns/op	       0 B/op	       0 allocs/op
+# Basic test
+BenchmarkOrderedMap-10                   	 3498038	       338.5 ns/op	      64 B/op	       2 allocs/op
+BenchmarkOrderedMapSlack-10              	 3410408	       352.6 ns/op	      64 B/op	       2 allocs/op
+BenchmarkOrderedMapWork-10               	 3167127	       378.6 ns/op	      64 B/op	       2 allocs/op
+BenchmarkOrderedMapWorkSlack-10          	 3039068	       394.3 ns/op	      64 B/op	       2 allocs/op
 
-# orderedmap
-BenchmarkOrderedMap_Store-10          	 2492340	       512.3 ns/op	     171 B/op	       1 allocs/op
-BenchmarkOrderedMap_LoadOrStore-10    	 2141635	       576.0 ns/op	     194 B/op	       1 allocs/op
-BenchmarkOrderedMap_Delete-10         	 6182010	       174.1 ns/op	       0 B/op	       0 allocs/op
+# Native Sync.Map test
+BenchmarkNativeSyncMap_Store-10          	 1510597	       668.7 ns/op	     140 B/op	       5 allocs/op
+BenchmarkNativeSyncMap_LoadOrStore-10    	 1749106	       689.8 ns/op	     181 B/op	       4 allocs/op
+BenchmarkNativeSyncMap_Delete-10         	 1000000	      2203 ns/op	       0 B/op	       0 allocs/op
+
+# OrderedMap test
+BenchmarkOrderedMap_Store-10             	 3161652	       379.7 ns/op	     120 B/op	       2 allocs/op
+BenchmarkOrderedMap_LoadOrStore-10       	 2854708	       421.1 ns/op	     125 B/op	       2 allocs/op
+BenchmarkOrderedMap_Delete-10            	 8021584	       144.9 ns/op	       0 B/op	       0 allocs/op
 ```

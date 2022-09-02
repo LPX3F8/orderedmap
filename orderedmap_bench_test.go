@@ -160,12 +160,9 @@ func BenchmarkOrderedMap_Delete(b *testing.B) {
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			var key int
-			m.Range(func(k int, v int) bool {
-				key = k
-				return false
-			})
-			m.Delete(key)
+			if m.Front() != nil {
+				m.Delete(m.Front().Key())
+			}
 		}
 	})
 }

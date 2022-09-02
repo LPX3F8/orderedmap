@@ -125,6 +125,13 @@ func TestOrderedMap_Example(t *testing.T) {
 	s1 := om.Slice(filter1, filter2, filter3)
 	fmt.Println(s1) // out: [2 4]
 
+	// travel items
+	for i := om.Front(); i != nil; i = i.Next() {
+		fmt.Println("[TEST FRONT]", i.Key(), i.Value())
+	}
+	for i := om.Back(); i != nil; i = i.Prev() {
+		fmt.Println("[TEST BACK]", i.Key(), i.Value())
+	}
 	// use a filter to filter the key value when travel items
 	om.TravelForward(func(idx int, k string, v int) (skip bool) {
 		fmt.Printf("[NOFILTER] idx: %v, key: %v, val: %v\n", idx, k, v)
