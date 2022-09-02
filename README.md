@@ -1,4 +1,8 @@
 # orderedmap
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Go Report Card](https://goreportcard.com/badge/github.com/LPX3F8/orderedmap)](https://goreportcard.com/report/github.com/LPX3F8/orderedmap)
+![Coverage](https://img.shields.io/badge/Coverage-95.3%25-brightgreen)
+
  🧑‍💻 Implementation of ordered map in golang. Fast, thread-safe and generic support
 
 # Install

@@ -103,6 +103,7 @@ func TestOrderedMap_MarshalJSON(t *testing.T) {
 		}{Key: "key3", KeyInfo: "k3info"}, 3)
 	d, err = json.Marshal(m2)
 	a.Error(err)
+	a.Equal(0, len(d))
 }
 
 func TestOrderedMap_Example(t *testing.T) {
