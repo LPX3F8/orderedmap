@@ -1,10 +1,15 @@
 package orderedmap
 
 import (
+	"bytes"
 	"sync"
+
+	j "github.com/json-iterator/go"
 
 	"github.com/LPX3F8/glist"
 )
+
+var _customJson = j.ConfigCompatibleWithStandardLibrary
 
 // OrderedMap use List[T] to ensure order
 // The actual key-value pair exists in the basic map
@@ -139,4 +144,30 @@ func (m *OrderedMap[K, V]) Clear() *OrderedMap[K, V] {
 	m.elements = map[K]*glist.Element[K]{}
 	m.values = map[K]V{}
 	return m
+}
+
+func (m *OrderedMap[K, V]) MarshalJSON() ([]byte, error) {
+	var err error
+	var keyBytes, valBytes []byte
+	buf := bytes.NewBuffer(nil)
+	buf.WriteRune('{')
+	for e := m.keys.Front(); e != nil; e = e.Next() {
+		if keyBytes, err = _customJson.Marshal(e.Value); err != nil {
+			break
+		}
+		if valBytes, err = _customJson.Marshal(m.values[e.Value]); err != nil {
+			break
+		}
+		buf.Write(keyBytes)
+		buf.WriteRune(':')
+		buf.Write(valBytes)
+		if e.Next() != nil {
+			buf.WriteRune(',')
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	buf.WriteRune('}')
+	return buf.Bytes(), nil
 }

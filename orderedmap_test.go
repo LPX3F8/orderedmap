@@ -1,6 +1,7 @@
 package orderedmap
 
 import (
+	"encoding/json"
 	"math/rand"
 	"sync"
 	"testing"
@@ -69,4 +70,36 @@ func hammerOrderedMap(t *testing.T, m *OrderedMap[int, int], loops int, group *s
 		}
 	}
 	group.Done()
+}
+
+func TestOrderedMap_MarshalJSON(t *testing.T) {
+	a := assert.New(t)
+	bytes1 := []byte(`{"key1":1,"key2":2,"key3":3}`)
+	m := New[string, int]()
+	m.Store("key1", 1)
+	m.Store("key2", 2)
+	m.Store("key3", 3)
+	d, err := json.Marshal(m)
+	a.Equal(d, bytes1)
+	a.NoError(err)
+
+	m2 := New[struct {
+		Key     string `json:"key"`
+		KeyInfo string `json:"keyInfo"`
+	}, int]()
+
+	m2.Store(struct {
+		Key     string `json:"key"`
+		KeyInfo string `json:"keyInfo"`
+	}{Key: "key1", KeyInfo: "k1info"}, 1).
+		Store(struct {
+			Key     string `json:"key"`
+			KeyInfo string `json:"keyInfo"`
+		}{Key: "key2", KeyInfo: "k2info"}, 2).
+		Store(struct {
+			Key     string `json:"key"`
+			KeyInfo string `json:"keyInfo"`
+		}{Key: "key3", KeyInfo: "k3info"}, 3)
+	d, err = json.Marshal(m2)
+	a.Error(err)
 }
