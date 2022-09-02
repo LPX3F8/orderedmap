@@ -2,25 +2,26 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Report Card](https://goreportcard.com/badge/github.com/LPX3F8/orderedmap)](https://goreportcard.com/report/github.com/LPX3F8/orderedmap)
 ![Coverage](https://img.shields.io/badge/Coverage-95.3%25-brightgreen)
-[![](https://img.shields.io/badge/README-中文-yellow.svg)](https://github.com/LPX3F8/orderedmap/blob/main/README_CN.md)
+[![](https://img.shields.io/badge/README-English-yellow.svg)](https://github.com/LPX3F8/orderedmap/blob/main/README.md)
 
- 🧑‍💻 Implementation of ordered map in golang. Fast, thread-safe and generic support
 
-### Install
+ 🧑‍💻 一个Go语言实现的有序字典，支持泛型，线程安全。
+
+### 安装
 - go version >= 1.18
 ```bash
 go get -u github.com/LPX3F8/orderedmap
 ```
 
-### Features
-- Support conversion to slices
-- Support JSON marshaler
-- Support ordered traversal
-- Support filter
-- Thread safety
-- Generics support
+### 特性
+- 支持过滤器；
+- 支持有序遍历(正/反+过滤器)；
+- 支持转换成切片(正/反+过滤器)；
+- 支持JSON序列化；
+- 支持泛型；
+- 线程安全；
 
-### Example
+### 使用案例
 ```go
 import "github.com/LPX3F8/orderedmap"
 
@@ -55,7 +56,7 @@ func main() {
 	fmt.Println(string(jBytes))
 ```
 
-### Benchmark
+### 性能测试
 ```text
 # orderedmap basic test
 BenchmarkOrderedMap-10                	 3441459	       340.9 ns/op	      32 B/op	       1 allocs/op
